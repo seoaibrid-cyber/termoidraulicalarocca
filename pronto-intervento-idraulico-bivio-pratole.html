@@ -74,6 +74,27 @@
             </nav>
         </div>
     </header>
+        <!-- Mobile Menu Overlay -->
+        <div class="mobile-menu-overlay" id="mobile-menu">
+            <button class="mobile-menu-close" id="mobile-menu-close" aria-label="Chiudi menu">
+                <i data-lucide="x"></i>
+            </button>
+            <ul class="mobile-nav-links">
+                <li><a href="index.html">Home</a></li>
+                <li><a href="index.html#servizi">Servizi</a></li>
+                <li><a href="index.html#caldaie">Caldaie</a></li>
+                <li><a href="blog.html">Blog</a></li>
+                <li><a href="index.html#contatti">Contatti</a></li>
+            </ul>
+            <div class="mobile-menu-ctas">
+                <a href="tel:+393476260531" class="mobile-menu-btn call">
+                    <i data-lucide="phone"></i> Chiama Ora
+                </a>
+                <a href="https://wa.me/393476260531" class="mobile-menu-btn whatsapp">
+                    <i data-lucide="message-circle"></i> WhatsApp
+                </a>
+            </div>
+        </div>
 
     <main>
         <!-- Hero Section -->
@@ -327,6 +348,29 @@
     <script type="module" src="./main.js"></script>
     <script>
         lucide.createIcons();
+    </script>
+    <script>
+        // Hamburger Menu
+        const hamburger = document.getElementById('hamburger');
+        const mobileMenu = document.getElementById('mobile-menu');
+        const mobileClose = document.getElementById('mobile-menu-close');
+        const mobileLinks = document.querySelectorAll('.mobile-nav-links a');
+
+        function openMenu() {
+            mobileMenu.classList.add('open');
+            hamburger.classList.add('active');
+            hamburger.setAttribute('aria-expanded', 'true');
+            document.body.style.overflow = 'hidden';
+        }
+        function closeMenu() {
+            mobileMenu.classList.remove('open');
+            hamburger.classList.remove('active');
+            hamburger.setAttribute('aria-expanded', 'false');
+            document.body.style.overflow = '';
+        }
+        if (hamburger) hamburger.addEventListener('click', openMenu);
+        if (mobileClose) mobileClose.addEventListener('click', closeMenu);
+        mobileLinks.forEach(link => link.addEventListener('click', closeMenu));
     </script>
 </body>
 </html>
