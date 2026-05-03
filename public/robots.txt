@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://www.tuodominio.it/sitemap.xml
+Sitemap: https://termoidraulicalarocca.netlify.app/sitemap.xml
