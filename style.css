@@ -333,22 +333,39 @@ nav {
 }
 
 .breve-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
 }
 
 .breve-list li {
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  font-weight: 500;
+  align-items: flex-start;
+  gap: 1.2rem;
+  font-weight: 400;
   list-style: none;
+  padding: 0.5rem 0;
 }
 
 .breve-list i {
   color: var(--secondary);
   flex-shrink: 0;
+  margin-top: 0.2rem;
+}
+
+.breve-list strong {
+  color: var(--text-dark);
+  font-weight: 700;
+  min-width: 100px;
+  display: inline-block;
+}
+
+@media (min-width: 768px) {
+  .breve-list {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+  }
 }
 
 /* Section Common */
@@ -449,8 +466,20 @@ section {
 
 .services-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  grid-template-columns: 1fr;
   gap: 2rem;
+}
+
+@media (min-width: 768px) {
+  .services-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .services-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
 }
 
 .service-card {
@@ -606,7 +635,7 @@ th {
   grid-template-columns: 1fr; 
   gap: 2rem; 
 }
-@media (min-width: 992px) { 
+@media (min-width: 1024px) { 
   .faq-grid { grid-template-columns: 1fr 1fr; } 
 }
 .faq-item { 
