@@ -818,3 +818,18 @@ p a:not(.cta-button):not(.read-more):hover,
 @media (min-width: 992px) {
   .mobile-menu-overlay { display: none; }
 }
+
+/* Fix: hide desktop nav on mobile */
+@media (max-width: 991px) {
+  .nav-links {
+    display: none !important;
+  }
+  .desktop-cta {
+    display: none !important;
+  }
+}
+
+/* Fix: hide CTA buttons inside mobile menu */
+.mobile-menu-ctas {
+  display: none !important;
+}
