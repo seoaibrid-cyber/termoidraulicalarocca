@@ -335,29 +335,45 @@ nav {
 .breve-list {
   display: flex;
   flex-direction: column;
-  gap: 1.2rem;
+  gap: 1.5rem;
 }
 
 .breve-list li {
   display: flex;
+  flex-direction: column; /* Stack on mobile */
+  gap: 0.3rem;
+  padding: 0.8rem 0;
+  border-bottom: 1px solid rgba(0,0,0,0.03);
+}
+
+.breve-list li:last-child {
+  border-bottom: none;
+}
+
+.breve-list .item-content {
+  display: flex;
   align-items: flex-start;
-  gap: 1.2rem;
-  font-weight: 400;
-  list-style: none;
-  padding: 0.5rem 0;
+  gap: 1rem;
 }
 
 .breve-list i {
   color: var(--secondary);
   flex-shrink: 0;
-  margin-top: 0.2rem;
+  margin-top: 0.3rem;
+  width: 20px;
 }
 
 .breve-list strong {
   color: var(--text-dark);
   font-weight: 700;
-  min-width: 100px;
-  display: inline-block;
+  font-size: 1.05rem;
+  display: block;
+  margin-bottom: 0.2rem;
+}
+
+.breve-list span {
+  color: var(--text-main);
+  line-height: 1.5;
 }
 
 @media (min-width: 768px) {
@@ -365,6 +381,11 @@ nav {
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 2rem;
+  }
+  .breve-list li {
+    flex-direction: row; /* Side by side on desktop */
+    align-items: flex-start;
+    border-bottom: none;
   }
 }
 
@@ -599,12 +620,6 @@ th {
   }
 }
 
-/* Migrated to mobile first */
-
-@media (max-width: 640px) {
-  .faq-grid { grid-template-columns: 1fr; }
-  .contact-form-container { padding: 2rem; }
-}
 
 /* Blog Styles */
 .blog-hero h1 {
@@ -760,7 +775,7 @@ p a:not(.cta-button):not(.read-more):hover,
 /* Testimonials Section */
 .testimonials { background: var(--white); padding: 100px 0; }
 .reviews-grid { display: grid; grid-template-columns: 1fr; gap: 2rem; }
-@media (min-width: 768px) { .reviews-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); } }
+@media (min-width: 1024px) { .reviews-grid { grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); } }
 .review-card { background: var(--bg-light); padding: 2.5rem; border-radius: var(--border-radius); border: 1px solid #eee; transition: var(--transition); }
 .review-card:hover { transform: translateY(-5px); box-shadow: var(--shadow-md); }
 .stars { color: #fbbf24; margin-bottom: 1rem; display: flex; gap: 2px; }
