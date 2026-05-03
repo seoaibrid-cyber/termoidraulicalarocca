@@ -1,0 +1,252 @@
+import logging
+from datetime import datetime, timezone, timedelta
+from fastapi import HTTPException
+from database import db
+
+logger = logging.getLogger("server")
+
+class GSCService:
+    @staticmethod
+    async def get_performance_summary(client_id: str, days: int = 28) -> dict:
+        """Fetches a summary of GSC data for the given client."""
+        client_doc = await db.clients.find_one({"id": client_id}, {"configuration.gsc": 1})
+        if not client_doc:
+            return {}
+            
+        gsc_config = (client_doc.get("configuration", {}) or {}).get("gsc", {})
+        tokens = gsc_config.get("tokens")
+        if not tokens or not gsc_config.get("connected"):
+            logger.warning(f"GSC not connected for client {client_id}")
+            return {}
+            
+        site_url = gsc_config.get("site_url", "")
+        if not site_url:
+            return {}
+
+        try:
+            import google.oauth2.credentials
+            from googleapiclient.discovery import build
+            from google.auth.transport.requests import Request
+            
+            creds = google.oauth2.credentials.Credentials(
+                token=tokens["token"],
+                refresh_token=tokens.get("refresh_token"),
+                token_uri=tokens.get("token_uri", "https://oauth2.googleapis.com/token"),
+                client_id=tokens.get("client_id"),
+                client_secret=tokens.get("client_secret")
+            )
+            
+            if creds.expired and creds.refresh_token:
+                creds.refresh(Request())
+                new_tokens = {
+                    "token": creds.token, "refresh_token": creds.refresh_token,
+                    "token_uri": creds.token_uri, "client_id": creds.client_id,
+                    "client_secret": creds.client_secret,
+                    "expiry": creds.expiry.isoformat() if creds.expiry else None
+                }
+                await db.clients.update_one({"id": client_id}, {"$set": {"configuration.gsc.tokens": new_tokens}})
+            
+            service = build("searchconsole", "v1", credentials=creds)
+            end_date = datetime.now(timezone.utc).date()
+            start_date = end_date - timedelta(days=days)
+            
+            # Simplified query for summary
+            response = service.searchanalytics().query(
+                siteUrl=site_url,
+                body={
+                    "startDate": start_date.isoformat(), 
+                    "endDate": end_date.isoformat(),
+                    "dimensions": ["query"], 
+                    "rowLimit": 20
+                }
+            ).execute()
+            
+            rows = response.get("rows", [])
+            keywords = []
+            total_clicks = 0
+            total_impressions = 0
+            
+            for row in rows:
+                if row.get("keys"):
+                    keywords.append({
+                        "query": row["keys"][0],
+                        "clicks": row.get("clicks", 0),
+                        "impressions": row.get("impressions", 0),
+                        "position": round(row.get("position", 0), 1)
+                    })
+                    total_clicks += row.get("clicks", 0)
+                    total_impressions += row.get("impressions", 0)
+            
+            return {
+                "top_keywords": keywords,
+                "total_clicks": total_clicks,
+                "total_impressions": total_impressions,
+                "avg_ctr": round((total_clicks / total_impressions * 100), 2) if total_impressions > 0 else 0,
+                "avg_position": round(sum(k["position"] for k in keywords) / max(len(keywords), 1), 1),
+                "period": f"last {days} days"
+            }
+        except Exception as e:
+            logger.error(f"GSC Summary fetch error for {client_id}: {e}")
+            return {}
+
+    @classmethod
+    async def get_page_performance(cls, client_id: str, days: int = 28, limit: int = 30) -> list:
+        """Fetches page-level performance to identify 'Donors' and 'Recipients'."""
+        client_doc = await db.clients.find_one({"id": client_id}, {"configuration.gsc": 1})
+        if not client_doc: return []
+        gsc_config = (client_doc.get("configuration", {}) or {}).get("gsc", {})
+        site_url = gsc_config.get("site_url", "")
+        tokens = gsc_config.get("tokens")
+        if not tokens or not site_url: return []
+
+        try:
+            import google.oauth2.credentials
+            from googleapiclient.discovery import build
+            from google.auth.transport.requests import Request
+            
+            creds = google.oauth2.credentials.Credentials(
+                token=tokens["token"], refresh_token=tokens.get("refresh_token"),
+                token_uri=tokens.get("token_uri", "https://oauth2.googleapis.com/token"),
+                client_id=tokens.get("client_id"), client_secret=tokens.get("client_secret")
+            )
+            if creds.expired and creds.refresh_token: creds.refresh(Request())
+            
+            service = build("searchconsole", "v1", credentials=creds)
+            end_date = datetime.now(timezone.utc).date()
+            start_date = end_date - timedelta(days=days)
+            
+            response = service.searchanalytics().query(
+                siteUrl=site_url,
+                body={
+                    "startDate": start_date.isoformat(), "endDate": end_date.isoformat(),
+                    "dimensions": ["page"], "rowLimit": limit
+                }
+            ).execute()
+            
+            pages = []
+            for row in response.get("rows", []) or []:
+                if not row or not row.get("keys"): continue
+                pages.append({
+                    "url": row["keys"][0],
+                    "clicks": row.get("clicks", 0),
+                    "impressions": row.get("impressions", 0),
+                    "position": round(row.get("position", 0), 1)
+                })
+            return pages
+        except Exception as e:
+            logger.error(f"GSC Page performance error for {client_id}: {e}")
+            return []
+
+    @classmethod
+    async def get_keyword_cannibalization(cls, client_id: str, days: int = 28, limit: int = 100) -> list:
+        """Identifies keywords that trigger multiple landing pages."""
+        client_doc = await db.clients.find_one({"id": client_id}, {"configuration.gsc": 1})
+        if not client_doc: return []
+        gsc_config = (client_doc.get("configuration", {}) or {}).get("gsc", {})
+        site_url = gsc_config.get("site_url", "")
+        tokens = gsc_config.get("tokens")
+        if not tokens or not site_url: return []
+
+        try:
+            import google.oauth2.credentials
+            from googleapiclient.discovery import build
+            from google.auth.transport.requests import Request
+            
+            creds = google.oauth2.credentials.Credentials(
+                token=tokens["token"], refresh_token=tokens.get("refresh_token"),
+                token_uri=tokens.get("token_uri", "https://oauth2.googleapis.com/token"),
+                client_id=tokens.get("client_id"), client_secret=tokens.get("client_secret")
+            )
+            if creds.expired and creds.refresh_token: creds.refresh(Request())
+            
+            service = build("searchconsole", "v1", credentials=creds)
+            end_date = datetime.now(timezone.utc).date()
+            start_date = end_date - timedelta(days=days)
+            
+            # Query by Query AND Page
+            response = service.searchanalytics().query(
+                siteUrl=site_url,
+                body={
+                    "startDate": start_date.isoformat(), "endDate": end_date.isoformat(),
+                    "dimensions": ["query", "page"], "rowLimit": limit
+                }
+            ).execute()
+            
+            # Group by Query
+            kw_map = {}
+            for row in response.get("rows", []) or []:
+                if not row or not row.get("keys") or len(row["keys"]) < 2: continue
+                kw = row["keys"][0]
+                url = row["keys"][1]
+                if kw not in kw_map: kw_map[kw] = []
+                kw_map[kw].append({
+                    "url": url,
+                    "clicks": row.get("clicks", 0),
+                    "impressions": row.get("impressions", 0),
+                    "position": round(row.get("position", 0), 1)
+                })
+            
+            # Filter for keywords with > 1 page
+            conflicts = []
+            for kw, pages in kw_map.items():
+                if len(pages) > 1:
+                    conflicts.append({"query": kw, "pages": pages})
+            
+            return conflicts
+        except Exception as e:
+            logger.error(f"GSC Cannibalization error for {client_id}: {e}")
+            return []
+
+    @classmethod
+    async def get_striking_distance_keywords(cls, client_id: str, days: int = 28, limit: int = 10) -> list:
+        """Finds keywords ranking in positions 4-12 (Striking Distance)."""
+        client_doc = await db.clients.find_one({"id": client_id}, {"configuration.gsc": 1})
+        if not client_doc: return []
+        gsc_config = (client_doc.get("configuration", {}) or {}).get("gsc", {})
+        site_url = gsc_config.get("site_url", "")
+        tokens = gsc_config.get("tokens")
+        if not tokens or not site_url: return []
+
+        try:
+            import google.oauth2.credentials
+            from googleapiclient.discovery import build
+            from google.auth.transport.requests import Request
+            
+            creds = google.oauth2.credentials.Credentials(
+                token=tokens["token"], refresh_token=tokens.get("refresh_token"),
+                token_uri=tokens.get("token_uri", "https://oauth2.googleapis.com/token"),
+                client_id=tokens.get("client_id"), client_secret=tokens.get("client_secret")
+            )
+            if creds.expired and creds.refresh_token: creds.refresh(Request())
+            
+            service = build("searchconsole", "v1", credentials=creds)
+            end_date = datetime.now(timezone.utc).date()
+            start_date = end_date - timedelta(days=days)
+            
+            response = service.searchanalytics().query(
+                siteUrl=site_url,
+                body={
+                    "startDate": start_date.isoformat(), "endDate": end_date.isoformat(),
+                    "dimensions": ["query", "page"], "rowLimit": limit * 5 # Get more to filter
+                }
+            ).execute()
+            
+            striking = []
+            for row in response.get("rows", []) or []:
+                if not row or not row.get("keys") or len(row["keys"]) < 2: continue
+                pos = row.get("position", 0)
+                if 4.0 <= pos <= 13.0:
+                    striking.append({
+                        "query": row["keys"][0],
+                        "url": row["keys"][1],
+                        "clicks": row.get("clicks", 0),
+                        "impressions": row.get("impressions", 0),
+                        "position": round(pos, 1)
+                    })
+            
+            # Sort by impressions (biggest opportunity)
+            striking.sort(key=lambda x: x["impressions"], reverse=True)
+            return striking[:limit]
+        except Exception as e:
+            logger.error(f"GSC Striking Distance error for {client_id}: {e}")
+            return []
